@@ -75,7 +75,7 @@ export async function saveTemplateSettings(): Promise<string[]> {
 
 	for (const template of templates) {
 		if (!template.noteNameFormat || template.noteNameFormat.trim() === '') {
-			warnings.push(`Warning: Template "${template.name}" has an empty note name format. Using default "{{title}}".`);
+			warnings.push(`Warning: Template \"${template.name}\" has an empty note name format. Using default \"{{title}}\".`);
 			template.noteNameFormat = '{{title}}';
 		}
 
@@ -105,7 +105,7 @@ async function prepareTemplateForSave(template: Template): Promise<[string[], st
 
 	// Check if the template size is approaching the limit
 	if (compressedData.length > SIZE_WARNING_THRESHOLD) {
-		return [chunks, `Warning: Template "${template.name}" is ${(compressedData.length / 1024).toFixed(2)}KB, which is approaching the storage limit.`];
+		return [chunks, `Warning: Template \"${template.name}\" is ${(compressedData.length / 1024).toFixed(2)}KB, which is approaching the storage limit.`];
 	}
 	return [chunks, null];
 }
@@ -116,17 +116,18 @@ export function createDefaultTemplate(): Template {
 		name: getMessage('defaultTemplateName'),
 		behavior: 'create',
 		noteNameFormat: '{{title}}',
-		path: 'Clippings',
+		path: 'Clippings/Articles',
 		noteContentFormat: '{{content}}',
 		context: "",
 		properties: [
 			{ id: Date.now().toString() + Math.random().toString(36).slice(2, 11), name: 'title', value: '{{title}}' },
 			{ id: Date.now().toString() + Math.random().toString(36).slice(2, 11), name: 'source', value: '{{url}}' },
-			{ id: Date.now().toString() + Math.random().toString(36).slice(2, 11), name: 'author', value: '{{author|split:", "|wikilink|join}}' },
+			{ id: Date.now().toString() + Math.random().toString(36).slice(2, 11), name: 'author', value: '{{author|split:\", \"|wikilink|join}}' },
+			{ id: Date.now().toString() + Math.random().toString(36).slice(2, 11), name: 'site', value: '{{site}}' },
 			{ id: Date.now().toString() + Math.random().toString(36).slice(2, 11), name: 'published', value: '{{published}}' },
-			{ id: Date.now().toString() + Math.random().toString(36).slice(2, 11), name: 'created', value: '{{date}}' },
+			{ id: Date.now().toString() + Math.random().toString(36).slice(2, 11), name: 'clipped', value: '{{date}}' },
 			{ id: Date.now().toString() + Math.random().toString(36).slice(2, 11), name: 'description', value: '{{description}}' },
-			{ id: Date.now().toString() + Math.random().toString(36).slice(2, 11), name: 'tags', value: 'clippings' }
+			{ id: Date.now().toString() + Math.random().toString(36).slice(2, 11), name: 'tags', value: 'web-clip, 待整理' }
 		],
 		triggers: []
 	};
@@ -212,11 +213,13 @@ async function updateGlobalPropertyTypes(templates: Template[]): Promise<void> {
 	const defaultTypes: { [key: string]: { type: string, defaultValue: string } } = {
 		'title': { type: 'text', defaultValue: '{{title}}' },
 		'source': { type: 'text', defaultValue: '{{url}}' },
-		'author': { type: 'multitext', defaultValue: '{{author|split:", "|wikilink|join}}' },
+		'author': { type: 'multitext', defaultValue: '{{author|split:\", \"|wikilink|join}}' },
+		'site': { type: 'text', defaultValue: '{{site}}' },
 		'published': { type: 'date', defaultValue: '{{published}}' },
 		'created': { type: 'date', defaultValue: '{{date}}' },
+		'clipped': { type: 'date', defaultValue: '{{date}}' },
 		'description': { type: 'text', defaultValue: '{{description}}' },
-		'tags': { type: 'multitext', defaultValue: 'clippings' }
+		'tags': { type: 'multitext', defaultValue: 'web-clip, 待整理' }
 	};
 
 	templates.forEach(template => {
