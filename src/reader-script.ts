@@ -34,4 +34,4 @@ import browser from './utils/browser-polyfill';
 			return true;
 		}
 	});
-})(); 
+})();

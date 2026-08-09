@@ -47,6 +47,23 @@
 			<div id="note-content-container">
 				<textarea id="note-content-field" rows="4" data-i18n="notesAboutPage"></textarea>
 			</div>
+			<div id="capture-routing" class="capture-routing">
+				<div class="capture-routing-header" data-i18n="captureRouting">Capture routing</div>
+				<div class="capture-routing-fields">
+					<label class="capture-routing-field">
+						<span data-i18n="captureIntent">Capture as</span>
+						<select id="capture-intent-select"></select>
+					</label>
+					<label class="capture-routing-field">
+						<span data-i18n="captureProject">Project</span>
+						<select id="capture-project-select"></select>
+					</label>
+					<div class="capture-routing-field capture-destination-field">
+						<span data-i18n="captureDestination">Destination</span>
+						<strong id="capture-destination"></strong>
+					</div>
+				</div>
+			</div>
 			<div class="clipper-footer">
 				<div class="vault-path-container">
 					<div id="vault-container" style="display: none;">

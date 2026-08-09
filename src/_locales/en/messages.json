@@ -1094,5 +1094,92 @@
 	},
 	"version": {
 		"message": "Version"
+	},
+	"captureSettings": {
+		"message": "Capture"
+	},
+	"captureInboxPath": {
+		"message": "Inbox path"
+	},
+	"captureInboxPathDescription": {
+		"message": "Notes captured as Read Later or Knowledge are saved here."
+	},
+	"captureProjects": {
+		"message": "Projects"
+	},
+	"captureProjectsDescription": {
+		"message": "Maintain a small project list for capture context. Project IDs remain stable when names change."
+	},
+	"captureProjectPlaceholder": {
+		"message": "Press enter to add a project"
+	},
+	"captureProjectName": {
+		"message": "Project name"
+	},
+	"researchQueue": {
+		"message": "Research Queue"
+	},
+	"researchQueuePending": {
+		"message": "Pending captures: $1"
+	},
+	"researchQueueUnavailable": {
+		"message": "Research Queue unavailable"
+	},
+	"confirmClearResearchQueue": {
+		"message": "Clear all Research Queue records?"
+	},
+	"researchQueueExportFailed": {
+		"message": "Unable to export Research Queue."
+	},
+	"researchQueueClearFailed": {
+		"message": "Unable to clear Research Queue."
+	},
+	"captureRouting": {
+		"message": "Capture routing"
+	},
+	"captureIntent": {
+		"message": "Capture as"
+	},
+	"captureProject": {
+		"message": "Project"
+	},
+	"captureProjectNone": {
+		"message": "None"
+	},
+	"captureDestination": {
+		"message": "Destination"
+	},
+	"captureDestinationObsidian": {
+		"message": "Obsidian"
+	},
+	"captureDestinationResearchQueue": {
+		"message": "Research Queue"
+	},
+	"captureIntentReference": {
+		"message": "Reference"
+	},
+	"captureIntentReadLater": {
+		"message": "Read Later"
+	},
+	"captureIntentResearch": {
+		"message": "Research"
+	},
+	"captureIntentKnowledge": {
+		"message": "Knowledge"
+	},
+	"captureIntentProjectMaterial": {
+		"message": "Project Material"
+	},
+	"captureQueued": {
+		"message": "Queued"
+	},
+	"captureDelivered": {
+		"message": "Captured"
+	},
+	"captureRoutingFailed": {
+		"message": "Capture failed"
+	},
+	"clear": {
+		"message": "Clear"
 	}
 }

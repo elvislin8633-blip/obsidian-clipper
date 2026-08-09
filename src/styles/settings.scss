@@ -349,6 +349,16 @@ label {
 	}
 }
 
+.capture-project-item {
+	input {
+		flex: 1;
+		min-width: 0;
+	}
+	button {
+		flex-shrink: 0;
+	}
+}
+
 #general-settings-form {
 	#keyboard-shortcuts-list {
 		display: flex;

@@ -1,7 +1,7 @@
 import dayjs from 'dayjs';
 import { Template, Property, PromptVariable } from '../types/types';
 import { incrementStat, addHistoryEntry, getClipHistory } from '../utils/storage-utils';
-import { generateFrontmatter, saveToObsidian } from '../utils/obsidian-note-creator';
+import { generateFrontmatter } from '../utils/obsidian-note-creator';
 import { extractPageContent, initializePageContent } from '../utils/content-extractor';
 import { compileTemplate } from '../utils/template-compiler';
 import { initializeIcons, getPropertyTypeIcon } from '../icons/icons';
@@ -23,6 +23,17 @@ import { sanitizeFileName } from '../utils/string-utils';
 import { saveFile } from '../utils/file-utils';
 import { translatePage, getMessage, setupLanguageAndDirection } from '../utils/i18n';
 import { formatPropertyValue } from '../utils/shared';
+import {
+	createCaptureId,
+	type CaptureContext,
+	type CaptureIntent,
+	type CaptureProject,
+	type CaptureSettings,
+	type DestinationId,
+} from '../capture/contracts';
+import { loadCaptureSettings } from '../capture/settings-storage';
+import { createDefaultCaptureRouter } from '../capture/create-router';
+import { destinationForIntent } from '../capture/routing';
 
 interface ReaderModeResponse {
 	success: boolean;
@@ -35,6 +46,7 @@ let templates: Template[] = [];
 let currentVariables: { [key: string]: string } = {};
 let currentTabId: number | undefined;
 let lastSelectedVault: string | null = null;
+let captureSettings: CaptureSettings = { inboxPath: 'Inbox', projects: [] };
 
 const isSidePanel = window.location.pathname.includes('side-panel.html');
 const urlParams = new URLSearchParams(window.location.search);
@@ -284,6 +296,7 @@ function setupMessageListeners() {
 
 document.addEventListener('DOMContentLoaded', async function() {
 	loadedSettings = await loadSettings();
+	captureSettings = await loadCaptureSettings();
 	if (isIframe) {
 		document.documentElement.classList.add('is-embedded');
 	}
@@ -291,14 +304,19 @@ document.addEventListener('DOMContentLoaded', async function() {
 	const isSidePanel = document.documentElement.classList.contains('is-side-panel');
 
 	try {
-		// Get the active tab via background script to handle Firefox compatibility
-		const response = await browser.runtime.sendMessage({ action: "getActiveTab" }) as { tabId?: number; error?: string };
-		if (!response || response.error || !response.tabId) {
-			showError(getMessage('pleaseReload'));
-			return;
+		// A standalone fallback tab carries the original page tab ID. Normal
+		// browser popups continue to resolve the active tab through background.
+		const requestedTabId = Number(urlParams.get('tabId'));
+		if (Number.isInteger(requestedTabId) && requestedTabId > 0) {
+			currentTabId = requestedTabId;
+		} else {
+			const response = await browser.runtime.sendMessage({ action: "getActiveTab" }) as { tabId?: number; error?: string };
+			if (!response || response.error || !response.tabId) {
+				showError(getMessage('pleaseReload'));
+				return;
+			}
+			currentTabId = response.tabId;
 		}
-		
-		currentTabId = response.tabId;
 		const tab = await getTabInfo(currentTabId);
 		const currentBrowser = await detectBrowser();
 		const isMobile = currentBrowser === 'mobile-safari';
@@ -379,6 +397,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 				// DOM-dependent initializations
 				updateVaultDropdown(loadedSettings.vaults);
 				populateTemplateDropdown();
+				initializeCaptureControls(captureSettings);
 				setupEventListeners(currentTabId);
 				await initializeUI();
 
@@ -572,6 +591,134 @@ function setupEventListeners(tabId: number) {
 		readerModeButton.addEventListener('click', () => toggleReaderMode(tabId));
 		checkReaderModeState(tabId);
 	}
+}
+
+const CAPTURE_INTENTS: Array<{ value: CaptureIntent; message: string }> = [
+	{ value: 'reference', message: 'captureIntentReference' },
+	{ value: 'read_later', message: 'captureIntentReadLater' },
+	{ value: 'research', message: 'captureIntentResearch' },
+	{ value: 'knowledge', message: 'captureIntentKnowledge' },
+	{ value: 'project_material', message: 'captureIntentProjectMaterial' },
+];
+
+function destinationLabel(destination: DestinationId): string {
+	return getMessage(destination === 'research_queue'
+		? 'captureDestinationResearchQueue'
+		: 'captureDestinationObsidian');
+}
+
+function updateCaptureDestinationPreview(): void {
+	const intentSelect = document.getElementById('capture-intent-select') as HTMLSelectElement | null;
+	const destination = document.getElementById('capture-destination') as HTMLElement | null;
+	if (!intentSelect || !destination) return;
+	const selectedIntent = intentSelect.value as CaptureIntent;
+	const intent = CAPTURE_INTENTS.some(candidate => candidate.value === selectedIntent)
+		? selectedIntent
+		: 'reference';
+	const resolved: DestinationId = destinationForIntent(intent);
+	destination.textContent = destinationLabel(resolved);
+}
+
+function populateCaptureProjects(projects: CaptureProject[]): void {
+	const projectSelect = document.getElementById('capture-project-select') as HTMLSelectElement | null;
+	if (!projectSelect) return;
+	projectSelect.textContent = '';
+
+	const noneOption = document.createElement('option');
+	noneOption.value = '';
+	noneOption.textContent = getMessage('captureProjectNone');
+	projectSelect.appendChild(noneOption);
+
+	projects.forEach(project => {
+		const option = document.createElement('option');
+		option.value = project.id;
+		option.textContent = project.name;
+		projectSelect.appendChild(option);
+	});
+}
+
+function initializeCaptureControls(settings: CaptureSettings): void {
+	const intentSelect = document.getElementById('capture-intent-select') as HTMLSelectElement | null;
+	if (intentSelect) {
+		intentSelect.textContent = '';
+		CAPTURE_INTENTS.forEach(intent => {
+			const option = document.createElement('option');
+			option.value = intent.value;
+			option.textContent = getMessage(intent.message);
+			intentSelect.appendChild(option);
+		});
+		intentSelect.value = 'reference';
+		intentSelect.addEventListener('change', () => {
+			updateCaptureDestinationPreview();
+			// A previous delivery changes the button label to Captured/Queued.
+			// Selecting a new intent starts a fresh capture attempt, so restore
+			// the configured action label and handler.
+			determineMainAction();
+		});
+	}
+
+	populateCaptureProjects(settings.projects);
+	updateCaptureDestinationPreview();
+}
+
+function getCaptureContext(tabInfo: { url: string; title?: string }): CaptureContext {
+	const intentSelect = document.getElementById('capture-intent-select') as HTMLSelectElement | null;
+	const projectSelect = document.getElementById('capture-project-select') as HTMLSelectElement | null;
+	const selectedIntent = intentSelect?.value as CaptureIntent | undefined;
+	const intent = selectedIntent && CAPTURE_INTENTS.some(candidate => candidate.value === selectedIntent)
+		? selectedIntent
+		: 'reference';
+	const project = captureSettings.projects.find(candidate => candidate.id === projectSelect?.value);
+
+	const variable = (name: string): string | undefined => {
+		const value = currentVariables[`{{${name}}}`];
+		return value?.trim() || undefined;
+	};
+
+	return {
+		captureId: createCaptureId(),
+		capturedAt: new Date().toISOString(),
+		intent,
+		projectId: project?.id,
+		projectName: project?.name,
+		source: {
+			url: tabInfo.url || variable('url') || '',
+			title: tabInfo.title || variable('title') || '',
+			selection: variable('selection'),
+			author: variable('author'),
+			site: variable('site'),
+			published: variable('published'),
+		},
+	};
+}
+
+function showCaptureFailure(error: unknown): void {
+	const errorMessage = document.querySelector('.error-message') as HTMLElement | null;
+	if (!errorMessage) return;
+	const message = error instanceof Error ? error.message : getMessage('captureRoutingFailed');
+	errorMessage.textContent = `${getMessage('captureRoutingFailed')}: ${message}`;
+	errorMessage.style.display = 'flex';
+	errorMessage.classList.add('capture-error');
+	document.querySelector('.clipper')?.classList.add('has-capture-error');
+}
+
+function clearCaptureFailure(): void {
+	const errorMessage = document.querySelector('.error-message') as HTMLElement | null;
+	if (errorMessage?.classList.contains('capture-error')) {
+		errorMessage.textContent = '';
+		errorMessage.style.display = 'none';
+		errorMessage.classList.remove('capture-error');
+	}
+	document.querySelector('.clipper')?.classList.remove('has-capture-error');
+}
+
+function showCaptureSuccess(result: { destination: DestinationId }): void {
+	clearCaptureFailure();
+	const clipButton = document.getElementById('clip-btn') as HTMLButtonElement | null;
+	if (!clipButton) return;
+	clipButton.textContent = getMessage(result.destination === 'research_queue'
+		? 'captureQueued'
+		: 'captureDelivered');
 }
 
 async function initializeUI() {
@@ -1323,6 +1470,11 @@ async function handleClipObsidian(): Promise<void> {
 		return;
 	}
 
+	const clipButton = document.getElementById('clip-btn') as HTMLButtonElement | null;
+	if (clipButton?.disabled) return;
+	if (clipButton) clipButton.disabled = true;
+	clearCaptureFailure();
+
 	try {
 		// Handle interpreter if needed
 		if (generalSettings.interpreterEnabled && interpretBtn && collectPromptVariables(currentTemplate).length > 0) {
@@ -1340,26 +1492,52 @@ async function handleClipObsidian(): Promise<void> {
 		const frontmatter = await generateFrontmatter(properties);
 		const fileContent = frontmatter + noteContentField.value;
 
-		// Save to Obsidian
+		// The official clipping pipeline ends here. Capture Router owns only
+		// context, reserved metadata, destination selection, and delivery.
 		const selectedVault = vaultDropdown.value || currentTemplate.vault || '';
 		const isDailyNote = currentTemplate.behavior === 'append-daily' || currentTemplate.behavior === 'prepend-daily';
 		const noteName = isDailyNote ? '' : noteNameField?.value || '';
 		const path = isDailyNote ? '' : pathField?.value || '';
-
-		await saveToObsidian(fileContent, noteName, path, selectedVault, currentTemplate.behavior);
 		const tabInfo = await getCurrentTabInfo();
-		await incrementStat('addToObsidian', selectedVault, path, tabInfo.url, tabInfo.title);
+		const router = createDefaultCaptureRouter(captureSettings);
+		const result = await router.route(
+			{
+				fileContent,
+				noteName,
+				path,
+				vault: selectedVault,
+				behavior: currentTemplate.behavior,
+				templateId: currentTemplate.id,
+			},
+			getCaptureContext(tabInfo),
+		);
 
-		lastSelectedVault = selectedVault;
-		await setLocalStorage('lastSelectedVault', lastSelectedVault);
+		if (result.destination === 'obsidian') {
+			try {
+				await incrementStat('addToObsidian', selectedVault, result.path || path, tabInfo.url, tabInfo.title);
+			} catch (error) {
+				console.warn('Capture delivered, but recording history failed:', error);
+			}
+		}
+
+		try {
+			lastSelectedVault = selectedVault;
+			await setLocalStorage('lastSelectedVault', lastSelectedVault);
+		} catch (error) {
+			console.warn('Capture delivered, but remembering the vault failed:', error);
+		}
+
+		showCaptureSuccess(result);
 
 		if (!isSidePanel) {
 			setTimeout(() => window.close(), 500);
+		} else if (clipButton) {
+			clipButton.disabled = false;
 		}
 	} catch (error) {
 		console.error('Error in handleClipObsidian:', error);
-		showError('failedToSaveFile');
-		throw error;
+		showCaptureFailure(error);
+		if (clipButton) clipButton.disabled = false;
 	}
 }
 

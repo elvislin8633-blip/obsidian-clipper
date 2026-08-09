@@ -1094,5 +1094,92 @@
 	},
 	"version": {
 		"message": "版本"
+	},
+	"captureSettings": {
+		"message": "捕捉"
+	},
+	"captureInboxPath": {
+		"message": "Inbox 路徑"
+	},
+	"captureInboxPathDescription": {
+		"message": "Read Later 或 Knowledge 捕捉的筆記會儲存到這裡。"
+	},
+	"captureProjects": {
+		"message": "專案"
+	},
+	"captureProjectsDescription": {
+		"message": "維護用於捕捉上下文的簡單專案清單。專案名稱變更時，Project ID 仍保持穩定。"
+	},
+	"captureProjectPlaceholder": {
+		"message": "按 Enter 新增專案"
+	},
+	"captureProjectName": {
+		"message": "專案名稱"
+	},
+	"researchQueue": {
+		"message": "Research Queue"
+	},
+	"researchQueuePending": {
+		"message": "待處理捕捉：$1"
+	},
+	"researchQueueUnavailable": {
+		"message": "Research Queue 無法使用"
+	},
+	"confirmClearResearchQueue": {
+		"message": "要清除所有 Research Queue 記錄嗎？"
+	},
+	"researchQueueExportFailed": {
+		"message": "無法匯出 Research Queue。"
+	},
+	"researchQueueClearFailed": {
+		"message": "無法清除 Research Queue。"
+	},
+	"captureRouting": {
+		"message": "捕捉路由"
+	},
+	"captureIntent": {
+		"message": "捕捉為"
+	},
+	"captureProject": {
+		"message": "專案"
+	},
+	"captureProjectNone": {
+		"message": "無"
+	},
+	"captureDestination": {
+		"message": "目的地"
+	},
+	"captureDestinationObsidian": {
+		"message": "Obsidian"
+	},
+	"captureDestinationResearchQueue": {
+		"message": "Research Queue"
+	},
+	"captureIntentReference": {
+		"message": "Reference"
+	},
+	"captureIntentReadLater": {
+		"message": "稍後閱讀"
+	},
+	"captureIntentResearch": {
+		"message": "研究"
+	},
+	"captureIntentKnowledge": {
+		"message": "知識"
+	},
+	"captureIntentProjectMaterial": {
+		"message": "專案素材"
+	},
+	"captureQueued": {
+		"message": "已加入 Queue"
+	},
+	"captureDelivered": {
+		"message": "已捕捉"
+	},
+	"captureRoutingFailed": {
+		"message": "捕捉失敗"
+	},
+	"clear": {
+		"message": "清除"
 	}
 }

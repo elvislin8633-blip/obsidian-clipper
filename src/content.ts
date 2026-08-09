@@ -89,6 +89,7 @@ declare global {
 
 	interface ContentResponse {
 		content: string;
+		markdownContent: string;
 		selectedHtml: string;
 		extractedContent: { [key: string]: string };
 		schemaOrgData: any;
@@ -222,6 +223,7 @@ declare global {
 				const extractedContent: { [key: string]: string } = {
 					...defuddled.variables,
 				};
+				const markdownContent = createMarkdownContent(defuddled.content, document.URL);
 
 				// Create a new DOMParser
 				const parser = new DOMParser();
@@ -268,6 +270,7 @@ declare global {
 				const response: ContentResponse = {
 					author: defuddled.author,
 					content: defuddled.content,
+					markdownContent,
 					description: defuddled.description,
 					domain: getDomain(document.URL),
 					extractedContent: extractedContent,

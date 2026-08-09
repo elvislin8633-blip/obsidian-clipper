@@ -18,6 +18,7 @@ import { getClipHistory } from '../utils/storage-utils';
 import dayjs from 'dayjs';
 import weekOfYear from 'dayjs/plugin/weekOfYear';
 import { showModal, hideModal } from '../utils/modal-utils';
+import { initializeCaptureSettingsUI } from './capture-settings';
 
 dayjs.extend(weekOfYear);
 
@@ -227,6 +228,7 @@ export function initializeGeneralSettings(): void {
 		initializeHighlighterSettings();
 		initializeExportHighlightsButton();
 		initializeSaveBehaviorDropdown();
+		await initializeCaptureSettingsUI();
 		await initializeUsageChart();
 
 		// Initialize feedback modal close button

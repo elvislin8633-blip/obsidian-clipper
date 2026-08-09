@@ -9,6 +9,7 @@ import { setPageUrl, setPageTitle, updatePageDomainSettings, getHighlights, repo
 import { throttle } from '../utils/throttle';
 import { loadSettings } from '../utils/storage-utils';
 import Defuddle from 'defuddle';
+import { createMarkdownContent } from 'defuddle/full';
 
 type MessageListener = (request: any, sender: any, sendResponse: (response?: any) => void) => true | undefined;
 let readerPageMessageListener: MessageListener | null = null;
@@ -359,6 +360,7 @@ async function setupReaderPageMessageHandler(articleUrl: string, defuddleResult:
 
 	const cachedContent = {
 		content: defuddleResult.content || '',
+		markdownContent: createMarkdownContent(defuddleResult.content || '', articleUrl),
 		title: defuddleResult.title || '',
 		author: defuddleResult.author || '',
 		description: defuddleResult.description || '',

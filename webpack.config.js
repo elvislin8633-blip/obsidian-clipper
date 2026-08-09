@@ -53,6 +53,9 @@ module.exports = (env, argv) => {
 		output: {
 			path: path.resolve(__dirname, outputDir),
 			filename: '[name].js',
+			// Service workers do not expose document.currentScript, so webpack
+			// cannot infer the public path for Quick Clip's lazy-loaded compiler.
+			publicPath: '',
 			module: false,
 		},
 		devtool: isProduction ? false : 'source-map',

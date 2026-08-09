@@ -8,6 +8,9 @@ import { unescapeValue } from '../utils/string-utils';
 import { showImportModal } from '../utils/import-modal';
 import { saveFile } from '../utils/file-utils';
 import { getMessage } from '../utils/i18n';
+import { addPropertyType } from '../utils/property-type-storage';
+
+export { addPropertyType } from '../utils/property-type-storage';
 
 export function initializePropertyTypesManager(): void {
 	ensureTagsProperty();
@@ -284,32 +287,6 @@ async function exportTypesJson(): Promise<void> {
 		mimeType: 'application/json',
 		onError: (error) => console.error('Failed to export types:', error)
 	});
-}
-
-export async function addPropertyType(name: string, type: string = 'text', defaultValue: string = ''): Promise<void> {
-	console.log(`addPropertyType called with: name=${name}, type=${type}, defaultValue=${defaultValue}`);
-	const existingPropertyType = generalSettings.propertyTypes.find(pt => pt.name === name);
-	if (!existingPropertyType) {
-		console.log(`Adding new property type: ${name} with type ${type}`);
-		const newPropertyType: PropertyType = { name, type };
-		if (defaultValue !== null && defaultValue !== '') {
-			newPropertyType.defaultValue = defaultValue;
-		}
-		generalSettings.propertyTypes.push(newPropertyType);
-		await saveSettings();
-	} else if (existingPropertyType.type !== type || existingPropertyType.defaultValue !== defaultValue) {
-		console.log(`Updating existing property type: ${name} from ${existingPropertyType.type} to ${type}`);
-		existingPropertyType.type = type;
-		if (defaultValue !== null && defaultValue !== '') {
-			existingPropertyType.defaultValue = defaultValue;
-		} else {
-			delete existingPropertyType.defaultValue;
-		}
-		await saveSettings();
-	} else {
-		console.log(`Property type ${name} already exists and is up to date`);
-	}
-	console.log('Current property types:', JSON.stringify(generalSettings.propertyTypes, null, 2));
 }
 
 export async function updatePropertyType(name: string, newType: string, newDefaultValue?: string): Promise<void> {

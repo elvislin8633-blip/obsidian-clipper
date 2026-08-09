@@ -139,6 +139,38 @@
 								<ul id="vault-list" class="setting-item-list"></ul>
 								</div>
 							</div>
+							<div class="setting-group" id="capture-settings-group">
+								<div class="setting-item setting-item-heading"><h3 data-i18n="captureSettings">Capture</h3></div>
+								<div class="setting-items">
+									<div class="setting-item mod-horizontal">
+										<div class="setting-item-info">
+											<label for="capture-inbox-path" data-i18n="captureInboxPath">Inbox path</label>
+											<div class="setting-item-description" data-i18n="captureInboxPathDescription">Notes captured as Read Later or Knowledge are saved here.</div>
+										</div>
+										<div class="setting-item-control">
+											<input type="text" id="capture-inbox-path" autocomplete="off" spellcheck="false" />
+										</div>
+									</div>
+									<div class="setting-item">
+										<div class="setting-item-info">
+											<label for="capture-project-input" data-i18n="captureProjects">Projects</label>
+											<div class="setting-item-description" data-i18n="captureProjectsDescription">Maintain a small project list for capture context. Project IDs remain stable when names change.</div>
+										</div>
+										<input type="text" id="capture-project-input" data-i18n="captureProjectPlaceholder" placeholder="Press enter to add a project" autocomplete="off" spellcheck="false" />
+										<ul id="capture-project-list" class="setting-item-list capture-project-list"></ul>
+									</div>
+									<div class="setting-item mod-horizontal">
+										<div class="setting-item-info">
+											<label data-i18n="researchQueue">Research Queue</label>
+											<div id="research-queue-count" class="setting-item-description"></div>
+										</div>
+										<div class="setting-item-control">
+											<button type="button" id="export-research-queue-btn" data-i18n="export">Export</button>
+											<button type="button" id="clear-research-queue-btn" data-i18n="clear">Clear</button>
+										</div>
+									</div>
+								</div>
+							</div>
 							<div class="setting-group" id="hotkeys-subsection">
 								<div class="setting-item setting-item-heading"><h3 data-i18n="hotkeys">Hotkeys</h3></div>
 								<div class="setting-items">

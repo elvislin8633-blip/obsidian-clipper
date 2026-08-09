@@ -1,11 +1,19 @@
 import browser from 'webextension-polyfill';
 import { detectBrowser } from './utils/browser-detection';
 import { updateCurrentActiveTab, isValidUrl, isBlankPage, isNormalPageUrl } from './utils/active-tab-manager';
-import { TextHighlightData } from './utils/highlighter';
+import type { TextHighlightData } from './utils/highlighter';
 import { debounce } from './utils/debounce';
-import { Settings } from './types/types';
+import type { Settings } from './types/types';
 import { debugLog } from './utils/debug';
-import { incrementStat } from './utils/storage-utils';
+import { getLocalStorage, incrementStat, loadSettings, generalSettings, setLocalStorage } from './utils/storage-utils';
+import type { ContentResponse } from './utils/content-extractor';
+import { executeQuickClip } from './utils/quick-clip';
+import { compileTemplate } from './utils/template-compiler';
+import { findMatchingTemplate, initializeTriggers } from './utils/triggers';
+import { loadTemplates } from './managers/template-manager';
+import { loadCaptureSettings } from './capture/settings-storage';
+import { createDefaultCaptureRouter } from './capture/create-router';
+import { createBackgroundObsidianSave } from './capture/adapters/background-obsidian';
 
 const YOUTUBE_EMBED_RULE_ID = 9001;
 const YOUTUBE_INNERTUBE_RULE_ID = 9002;
@@ -233,6 +241,10 @@ async function exitReaderPageIfNeeded(tabId: number, readerUrl?: string): Promis
 
 async function initialize() {
 	try {
+		// Quick Clip runs in the background context, so load the same settings
+		// that the popup normally initializes before using templates or saving.
+		await loadSettings();
+
 		// Set up tab listeners
 		await setupTabListeners();
 
@@ -742,6 +754,103 @@ browser.runtime.onMessage.addListener((request: unknown, sender: browser.Runtime
 	return undefined;
 });
 
+async function runQuickClip(tabId: number): Promise<void> {
+	await loadSettings();
+	const captureSettings = await loadCaptureSettings();
+	const captureRouter = createDefaultCaptureRouter(captureSettings, {
+		obsidianSave: createBackgroundObsidianSave(tabId),
+	});
+	await executeQuickClip(tabId, {
+		getTab: async (id) => {
+			const tab = await browser.tabs.get(id);
+			return { url: tab.url };
+		},
+		ensureContentScriptLoaded: ensureContentScriptLoadedInBackground,
+		extractPageContent: extractQuickClipPageContent,
+		loadTemplates,
+		initializeTriggers,
+		findMatchingTemplate,
+		getPropertyTypes: () => {
+			const propertyTypes: Record<string, string> = {};
+			generalSettings.propertyTypes.forEach(propertyType => {
+				propertyTypes[propertyType.name] = propertyType.type;
+			});
+			return propertyTypes;
+		},
+		compileTemplate: compileQuickClipTemplate,
+		getVault: async (template) => {
+			const rememberedVault = await getLocalStorage('lastSelectedVault');
+			return template.vault ||
+				(typeof rememberedVault === 'string' ? rememberedVault : '') ||
+				generalSettings.vaults[0] ||
+				'';
+		},
+		routeCapture: (payload, context) => captureRouter.route(payload, context),
+		recordSave: (vault, path, url, title) =>
+			incrementStat('addToObsidian', vault, path, url, title),
+		rememberVault: (vault) => setLocalStorage('lastSelectedVault', vault),
+	});
+}
+
+async function compileQuickClipTemplate(
+	tabId: number,
+	text: string,
+	variables: { [key: string]: any },
+	currentUrl: string
+): Promise<string> {
+	// Keep Quick Clip in the same official template compiler pipeline. This is
+	// intentionally a static import: webpack's dynamic import loader expects
+	// `document` to append a script tag, but MV3 service workers have no DOM.
+	return compileTemplate(tabId, text, variables, currentUrl);
+}
+
+async function extractQuickClipPageContent(tabId: number): Promise<ContentResponse> {
+	const requestPageContent = async (): Promise<ContentResponse> => {
+		const response = await routeMessageToTab(tabId, { action: 'getPageContent' }) as ContentResponse & { success?: boolean; error?: string };
+		if (!response || response.success === false || !response.content || !response.markdownContent) {
+			throw new Error(response?.error || 'No content received from page');
+		}
+		return response;
+	};
+
+	try {
+		return await requestPageContent();
+	} catch (firstError) {
+		// Retry once after refreshing the content script, matching the popup's
+		// stale-script recovery without importing DOM-heavy extraction code into
+		// the service worker.
+		debugLog('Clipper', 'Quick Clip extraction failed, retrying...', firstError);
+		try {
+			await injectContentScript(tabId);
+		} catch {
+			// The second request may still work for reader/extension pages.
+		}
+		return requestPageContent();
+	}
+}
+
+async function showQuickClipSuccess(tabId: number): Promise<void> {
+	try {
+		await browser.action.setBadgeText({ tabId, text: '✓' });
+		setTimeout(() => {
+			browser.action.setBadgeText({ tabId, text: '' }).catch(() => undefined);
+		}, 1500);
+	} catch (error) {
+		// The badge is only a short status hint; it must not affect saving.
+		debugLog('Clipper', 'Unable to show Quick Clip success badge:', error);
+	}
+}
+
+async function quickClipOrFallback(tabId: number): Promise<void> {
+	try {
+		await runQuickClip(tabId);
+		await showQuickClipSuccess(tabId);
+	} catch (error) {
+		console.error('[Obsidian Clipper] Quick Clip failed; opening the editor:', error);
+		await openAdvancedPopup(tabId);
+	}
+}
+
 browser.commands.onCommand.addListener(async (command, tab) => {
 	// Some browsers (e.g. Orion) don't pass the tab parameter, so fall back to querying
 	if (!tab?.id) {
@@ -749,14 +858,14 @@ browser.commands.onCommand.addListener(async (command, tab) => {
 		tab = tabs[0];
 	}
 
+	if (command === '_execute_action') {
+		await openPopup(tab?.id);
+		return;
+	}
+
 	if (command === 'quick_clip') {
-		if (tab?.id) {
-			openPopup();
-			setTimeout(() => {
-				browser.runtime.sendMessage({action: "triggerQuickClip"})
-					.catch(error => console.error("Failed to send quick clip message:", error));
-			}, 500);
-		}
+		if (tab?.id) await quickClipOrFallback(tab.id);
+		return;
 	}
 	if (command === "toggle_highlighter" && tab?.id) {
 		await ensureContentScriptLoadedInBackground(tab.id);
@@ -855,7 +964,7 @@ const debouncedUpdateContextMenu = debounce(async (tabId: number) => {
 
 browser.contextMenus.onClicked.addListener(async (info, tab) => {
 	if (info.menuItemId === "open-obsidian-clipper") {
-		openPopup();
+		await openPopup(tab?.id);
 	} else if (info.menuItemId === "enter-highlighter" && tab && tab.id) {
 		await setHighlighterMode(tab.id, true);
 	} else if (info.menuItemId === "exit-highlighter" && tab && tab.id) {
@@ -1059,6 +1168,8 @@ async function updateActionPopup(openBehavior?: Settings['openBehavior']): Promi
 	if (openBehavior === 'reader' || openBehavior === 'embedded') {
 		await browser.action.setPopup({ popup: '' });
 	} else {
+		// The action icon is the Capture form entry point. Quick Clip remains a
+		// separate command and never replaces the normal popup.
 		await browser.action.setPopup({ popup: 'popup.html' });
 	}
 }
@@ -1066,7 +1177,32 @@ async function updateActionPopup(openBehavior?: Settings['openBehavior']): Promi
 let currentOpenBehavior: Settings['openBehavior'] = 'popup';
 
 // In reader/embedded mode, opens embedded iframe instead of popup.
-async function openPopup(): Promise<void> {
+async function openAdvancedPopup(tabId?: number): Promise<void> {
+	const action = browser.action as typeof browser.action & {
+		openPopup?: () => Promise<void>;
+	};
+
+	if (typeof action.openPopup === 'function') {
+		try {
+			await browser.action.setPopup({ popup: 'popup.html' });
+			await action.openPopup();
+			return;
+		} catch (error) {
+			console.warn('Unable to open the action popup, using an extension tab:', error);
+		} finally {
+			await browser.action.setPopup({
+				popup: currentOpenBehavior === 'popup' ? 'popup.html' : ''
+			}).catch(() => undefined);
+		}
+	}
+
+	// Firefox versions without action.openPopup still get the same editor
+	// entry point, opened as an extension tab.
+	const query = tabId ? `?tabId=${encodeURIComponent(tabId)}` : '';
+	await browser.tabs.create({ url: browser.runtime.getURL(`popup.html${query}`) });
+}
+
+async function openPopup(tabId?: number): Promise<void> {
 	if (currentOpenBehavior === 'reader' || currentOpenBehavior === 'embedded') {
 		const tabs = await browser.tabs.query({ active: true, currentWindow: true });
 		const tab = tabs[0];
@@ -1077,7 +1213,7 @@ async function openPopup(): Promise<void> {
 		}
 		// Fall through to popup if tab is invalid
 	}
-	await browser.action.openPopup();
+	await openAdvancedPopup(tabId);
 }
 
 browser.action.onClicked.addListener(async (tab) => {
@@ -1094,6 +1230,8 @@ browser.action.onClicked.addListener(async (tab) => {
 	} else if (currentOpenBehavior === 'embedded') {
 		await ensureContentScriptLoadedInBackground(tab.id);
 		await browser.tabs.sendMessage(tab.id, { action: "toggle-iframe" });
+	} else {
+		await openPopup(tab.id);
 	}
 });
 
