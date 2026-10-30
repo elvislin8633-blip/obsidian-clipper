@@ -1170,6 +1170,21 @@
 	"captureIntentProjectMaterial": {
 		"message": "專案素材"
 	},
+	"captureActionReference": {
+		"message": "新增參考資料到 Obsidian"
+	},
+	"captureActionReadLater": {
+		"message": "儲存到 Inbox 供稍後閱讀"
+	},
+	"captureActionResearch": {
+		"message": "加入 Research Queue"
+	},
+	"captureActionKnowledge": {
+		"message": "儲存知識到 Inbox"
+	},
+	"captureActionProjectMaterial": {
+		"message": "新增專案素材到 Obsidian"
+	},
 	"captureQueued": {
 		"message": "已加入 Queue"
 	},

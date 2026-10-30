@@ -33,7 +33,7 @@ import {
 } from '../capture/contracts';
 import { loadCaptureSettings } from '../capture/settings-storage';
 import { createDefaultCaptureRouter } from '../capture/create-router';
-import { destinationForIntent } from '../capture/routing';
+import { resolveCaptureAction } from '../capture/capture-action';
 
 interface ReaderModeResponse {
 	success: boolean;
@@ -601,22 +601,22 @@ const CAPTURE_INTENTS: Array<{ value: CaptureIntent; message: string }> = [
 	{ value: 'project_material', message: 'captureIntentProjectMaterial' },
 ];
 
-function destinationLabel(destination: DestinationId): string {
-	return getMessage(destination === 'research_queue'
-		? 'captureDestinationResearchQueue'
-		: 'captureDestinationObsidian');
+function getSelectedCaptureIntent(): CaptureIntent {
+	const intentSelect = document.getElementById('capture-intent-select') as HTMLSelectElement | null;
+	const selectedIntent = intentSelect?.value as CaptureIntent | undefined;
+	return selectedIntent && CAPTURE_INTENTS.some(candidate => candidate.value === selectedIntent)
+		? selectedIntent
+		: 'reference';
 }
 
 function updateCaptureDestinationPreview(): void {
-	const intentSelect = document.getElementById('capture-intent-select') as HTMLSelectElement | null;
 	const destination = document.getElementById('capture-destination') as HTMLElement | null;
-	if (!intentSelect || !destination) return;
-	const selectedIntent = intentSelect.value as CaptureIntent;
-	const intent = CAPTURE_INTENTS.some(candidate => candidate.value === selectedIntent)
-		? selectedIntent
-		: 'reference';
-	const resolved: DestinationId = destinationForIntent(intent);
-	destination.textContent = destinationLabel(resolved);
+	if (!destination) return;
+	const resolution = resolveCaptureAction(
+		getSelectedCaptureIntent(),
+		loadedSettings?.saveBehavior || 'addToObsidian',
+	);
+	destination.textContent = getMessage(resolution.previewLabelKey);
 }
 
 function populateCaptureProjects(projects: CaptureProject[]): void {
@@ -1431,28 +1431,38 @@ function determineMainAction() {
 	// Clear existing secondary actions
 	secondaryActions.textContent = '';
 
-	// Set up actions based on saved behavior
-	switch (loadedSettings.saveBehavior) {
+	const resolution = resolveCaptureAction(
+		getSelectedCaptureIntent(),
+		loadedSettings.saveBehavior,
+	);
+	const addCaptureSecondaryAction = () => addSecondaryAction(
+		secondaryActions,
+		resolution.captureLabelKey,
+		() => handleClipObsidian(),
+	);
+
+	// Set up actions based on saved behavior. Capture remains the configured
+	// primary action for addToObsidian, while copy/download stay primary and
+	// expose the intent-specific capture route as a secondary action.
+	switch (resolution.primaryAction) {
 		case 'copyToClipboard':
-			mainButton.textContent = getMessage('copyToClipboard');
+			mainButton.textContent = getMessage(resolution.primaryLabelKey);
 			mainButton.onclick = () => copyContent();
-			// Add direct actions to secondary
-			addSecondaryAction(secondaryActions, 'addToObsidian', () => handleClipObsidian());
+			addCaptureSecondaryAction();
 			addSecondaryAction(secondaryActions, 'saveFile', handleSaveToDownloads);
 			break;
 		case 'saveFile':
-			mainButton.textContent = getMessage('saveFile');
+			mainButton.textContent = getMessage(resolution.primaryLabelKey);
 			mainButton.onclick = () => handleSaveToDownloads();
-			// Add direct actions to secondary
-			addSecondaryAction(secondaryActions, 'addToObsidian', () => handleClipObsidian());
+			addCaptureSecondaryAction();
 			addSecondaryAction(secondaryActions, 'copyToClipboard', copyContent);
 			break;
-		default: // 'addToObsidian'
-			mainButton.textContent = getMessage('addToObsidian');
+		case 'capture':
+			mainButton.textContent = getMessage(resolution.primaryLabelKey);
 			mainButton.onclick = () => handleClipObsidian();
-			// Add direct actions to secondary
 			addSecondaryAction(secondaryActions, 'copyToClipboard', copyContent);
 			addSecondaryAction(secondaryActions, 'saveFile', handleSaveToDownloads);
+			break;
 	}
 }
 
@@ -1496,7 +1506,9 @@ async function handleClipObsidian(): Promise<void> {
 		// context, reserved metadata, destination selection, and delivery.
 		const selectedVault = vaultDropdown.value || currentTemplate.vault || '';
 		const isDailyNote = currentTemplate.behavior === 'append-daily' || currentTemplate.behavior === 'prepend-daily';
-		const noteName = isDailyNote ? '' : noteNameField?.value || '';
+		// Keep the compiled name in the payload. Daily delivery ignores it, while
+		// the Router's Inbox override needs it for Read Later/Knowledge captures.
+		const noteName = noteNameField?.value.trim() || 'Untitled';
 		const path = isDailyNote ? '' : pathField?.value || '';
 		const tabInfo = await getCurrentTabInfo();
 		const router = createDefaultCaptureRouter(captureSettings);
@@ -1572,7 +1584,13 @@ function getActionIcon(actionType: string): string {
 	switch (actionType) {
 		case 'copyToClipboard': return 'copy';
 		case 'saveFile': return 'file-down';
-		case 'addToObsidian': return 'pen-line';
+		case 'addToObsidian':
+		case 'captureActionReference':
+		case 'captureActionReadLater':
+		case 'captureActionResearch':
+		case 'captureActionKnowledge':
+		case 'captureActionProjectMaterial':
+			return 'pen-line';
 		default: return 'plus';
 	}
 }

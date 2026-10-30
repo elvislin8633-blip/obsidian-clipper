@@ -1170,6 +1170,21 @@
 	"captureIntentProjectMaterial": {
 		"message": "Project Material"
 	},
+	"captureActionReference": {
+		"message": "Add reference to Obsidian"
+	},
+	"captureActionReadLater": {
+		"message": "Save to Inbox for later"
+	},
+	"captureActionResearch": {
+		"message": "Add to Research Queue"
+	},
+	"captureActionKnowledge": {
+		"message": "Save knowledge to Inbox"
+	},
+	"captureActionProjectMaterial": {
+		"message": "Add project material to Obsidian"
+	},
 	"captureQueued": {
 		"message": "Queued"
 	},

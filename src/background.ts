@@ -14,9 +14,15 @@ import { loadTemplates } from './managers/template-manager';
 import { loadCaptureSettings } from './capture/settings-storage';
 import { createDefaultCaptureRouter } from './capture/create-router';
 import { createBackgroundObsidianSave } from './capture/adapters/background-obsidian';
+import { registerResearchQueueMessageHandler } from './capture/queue-writer';
 
 const YOUTUBE_EMBED_RULE_ID = 9001;
 const YOUTUBE_INNERTUBE_RULE_ID = 9002;
+
+// Register before any background work can service popup or side-panel
+// requests. The handler claims only Research Queue write actions and shares a
+// single serializer for append and clear operations.
+registerResearchQueueMessageHandler();
 
 // Chrome: declarativeNetRequest to rewrite Referer on YouTube embeds.
 // Safari/Firefox use the native video element instead (see reader.ts).

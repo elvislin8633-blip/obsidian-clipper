@@ -126,7 +126,12 @@ describe('CaptureRouter', () => {
 		expect(content).toContain('custom: "yes"');
 	});
 
-	test.each(['read_later', 'knowledge'] as const)('%s resolves the configured Inbox path', async intent => {
+	test.each([
+		['append-daily', 'read_later'],
+		['append-daily', 'knowledge'],
+		['prepend-daily', 'read_later'],
+		['prepend-daily', 'knowledge'],
+	] as const)('%s preserves the compiled name for %s Inbox captures', async (behavior, intent) => {
 		let received: Parameters<DestinationAdapter['deliver']>[0] | undefined;
 		const obsidian: DestinationAdapter = {
 			id: 'obsidian',
@@ -141,8 +146,12 @@ describe('CaptureRouter', () => {
 			generateFrontmatter,
 		);
 
-		await router.route(makePayload({ path: 'Template Path', behavior: 'append-daily' }), makeContext({ intent }));
+		await router.route(
+			makePayload({ noteName: 'Compiled article name', path: 'Template Path', behavior }),
+			makeContext({ intent }),
+		);
 
+		expect(received?.payload.noteName).toBe('Compiled article name');
 		expect(received?.payload.path).toBe('Knowledge/Inbox');
 		expect(received?.payload.behavior).toBe('create');
 	});

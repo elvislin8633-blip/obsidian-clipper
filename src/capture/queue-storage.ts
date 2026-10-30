@@ -3,6 +3,11 @@ import {
 	CAPTURE_SCHEMA_VERSION,
 	type ResearchQueueRecord,
 } from './contracts';
+import {
+	RESEARCH_QUEUE_APPEND_ACTION,
+	RESEARCH_QUEUE_CLEAR_ACTION,
+	sendResearchQueueWrite,
+} from './queue-messaging';
 
 export const RESEARCH_QUEUE_STORAGE_KEY = `research_queue_v${CAPTURE_SCHEMA_VERSION}`;
 
@@ -84,7 +89,12 @@ export async function readResearchQueue(): Promise<ResearchQueueRecord[]> {
 	}
 }
 
-export async function appendResearchQueue(record: ResearchQueueRecord): Promise<void> {
+/**
+ * Apply an append in the background context. Callers in extension pages must
+ * use appendResearchQueue(), which crosses the runtime message boundary so all
+ * popup and side-panel writers share the background serializer.
+ */
+export async function appendResearchQueueDirect(record: ResearchQueueRecord): Promise<void> {
 	const validated = validateResearchQueueRecord(record);
 	const queue = await readResearchQueue();
 	try {
@@ -96,9 +106,35 @@ export async function appendResearchQueue(record: ResearchQueueRecord): Promise<
 	}
 }
 
-export async function clearResearchQueue(): Promise<void> {
+/** Apply a clear in the background context. */
+export async function clearResearchQueueDirect(): Promise<void> {
 	try {
 		await browser.storage.local.set({ [RESEARCH_QUEUE_STORAGE_KEY]: [] });
+	} catch (error) {
+		throw new ResearchQueueStorageError('Unable to clear Research Queue.', { cause: error });
+	}
+}
+
+/**
+ * Public append entry point for popup and side-panel contexts. The background
+ * handler validates the record again before applying this request.
+ */
+export async function appendResearchQueue(record: ResearchQueueRecord): Promise<void> {
+	const validated = validateResearchQueueRecord(record);
+	try {
+		await sendResearchQueueWrite({
+			action: RESEARCH_QUEUE_APPEND_ACTION,
+			record: validated,
+		});
+	} catch (error) {
+		throw new ResearchQueueStorageError('Unable to persist Research Queue record.', { cause: error });
+	}
+}
+
+/** Public clear entry point for popup and side-panel contexts. */
+export async function clearResearchQueue(): Promise<void> {
+	try {
+		await sendResearchQueueWrite({ action: RESEARCH_QUEUE_CLEAR_ACTION });
 	} catch (error) {
 		throw new ResearchQueueStorageError('Unable to clear Research Queue.', { cause: error });
 	}

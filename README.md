@@ -1,3 +1,16 @@
+# Obsidian Web Clipper — Knowledge Capture fork
+
+這個 fork 在原版 Web Clipper 上加入 Quick Clip 與 Knowledge Capture Router。下方官方商店連結安裝的是官方版本；使用本 fork 請依本頁「Install the extension locally」載入建置結果。
+
+- **Quick Clip**：使用瀏覽器的 `quick_clip` 快捷鍵（Chrome 預設 `Alt+Shift+O`，可於 `chrome://extensions/shortcuts` 調整），直接使用模板儲存至 Obsidian，固定為 Reference、無專案。
+- **Capture**：在編輯器選擇 Reference、Read Later、Research、Knowledge 或 Project Material，並可附上專案。Read Later／Knowledge 建立至設定的 Inbox；Reference／Project Material 使用模板路徑。
+- **Research Queue**：Research 留在此瀏覽器的本機佇列。從 Settings → General → Capture 查看筆數、匯出 JSON 或確認後清空；目前沒有自動研究處理功能。重要資料請定期匯出。
+- **儲存偏好**：複製／下載仍遵循既有主按鈕偏好；使用其他動作中的 Capture 才會送往 Obsidian 或 Research Queue。
+
+開發驗證：安裝依賴後執行 `npm run verify`，依序執行測試、script CLI 測試、TypeScript、字串掃描及三種瀏覽器 production build。字串掃描列出的 unused 候選供人工檢查，並不代表缺譯檢查。Build 通過後仍需重新載入擴充功能並實測瀏覽器與 Obsidian。
+
+---
+
 Obsidian Web Clipper helps you highlight and capture the web in your favorite browser. Anything you save is stored as durable Markdown files that you can read offline, and preserve for the long term.
 
 - **[Download Web Clipper](https://obsidian.md/clipper)**

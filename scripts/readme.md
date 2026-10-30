@@ -1,5 +1,29 @@
 ## Scripts
 
+### Verify this fork
+
+```bash
+npm run verify
+```
+
+Runs unit tests, the locale CLI exit-code tests, TypeScript, the unused-string
+scan, and Chrome/Firefox/Safari production builds. Unused-string candidates are
+informational; missing or malformed locale source files fail the command.
+
+Optional browser smoke (requires a separate Playwright installation with its
+Chromium browser available):
+
+```bash
+node scripts/smoke-capture.cjs
+```
+
+If Playwright is outside this checkout, set `PLAYWRIGHT_MODULE` to its absolute
+module directory. The smoke loads `dist/` in a disposable profile and serves a
+local fixture. It checks action labels, daily-note routing, rejected handoffs,
+and concurrent Research Queue writes. OS handoffs are intercepted: it does not
+write to an Obsidian vault or touch an existing browser profile. Evidence is
+saved to `output/playwright/`. Rebuild before running after source changes.
+
 ### Localization
 
 First, add an OpenAI API key in `.env` at the root of the repo:
